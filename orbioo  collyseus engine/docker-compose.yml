@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # The Orbioo Multiplayer Engine
+  engine:
+    build: .
+    container_name: orbioo-engine
+    restart: always
+    ports:
+      - "2567:2567"
+      - "2568:2568"
+      - "2569:2569"
+      - "2570:2570"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - orbioo-net
+
+  # The Redis Brain
+  redis:
+    image: redis:alpine
+    container_name: orbioo-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - orbioo-net
+
+networks:
+  orbioo-net:
+    driver: bridge

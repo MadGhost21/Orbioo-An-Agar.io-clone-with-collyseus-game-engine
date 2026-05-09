@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Skin Studio – Orbioo Open Source</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html, body { overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+body{min-height:100vh; background:radial-gradient(ellipse at top,#1a1a2e 0%,#0d0d1a 100%); display:flex; flex-direction:column; align-items:center; padding:30px 16px 60px; font-family:'Segoe UI',sans-serif; color:#eee; overflow-y: auto;}
+h1{font-size:2rem;letter-spacing:2px;margin-bottom:6px;color:#fff;text-shadow:0 0 20px #6af}
+.subtitle{color:#aaa;margin-bottom:30px;font-size:.9rem}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px 16px;width:100%;max-width:700px;backdrop-filter:blur(8px);margin-bottom:20px}
+.card h2{font-size:1rem;color:#ccc;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px}
+#previewWrap{display:flex;justify-content:center;align-items:center;margin-bottom:20px;height:190px}
+.skin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(65px,1fr));gap:8px;margin-bottom:8px}
+.preset-btn{border:2px solid transparent;border-radius:10px;padding:6px 2px 6px;cursor:pointer;font-size:10px;color:#fff;text-align:center;font-weight:600;transition:border-color .15s,transform .1s;background:#222;position:relative}
+.preset-btn:hover{transform:scale(1.05); background:#2a2a2a}
+.preset-btn.active{border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,.3); background:#333}
+.swatch{width:32px;height:32px;border-radius:50%;margin:0 auto 5px;border:1px solid rgba(255,255,255,.2);overflow:hidden;display:flex;align-items:center;justify-content:center; background:#111}
+.swatch img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+#skinSearch:focus { border-color: #6a5af9 !important; box-shadow: 0 0 10px rgba(106, 90, 249, 0.3); }
+/* Color pickers */
+.color-row{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.color-row label{width:120px;font-size:.85rem;color:#bbb}
+.color-row input[type=color]{width:48px;height:48px;border:none;border-radius:50%;cursor:pointer;background:none;padding:0;overflow:hidden}
+.color-row input[type=color]::-webkit-color-swatch { border: none; border-radius: 50%; padding: 0; }
+.color-row input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.color-row input[type=color]::-moz-color-swatch { border: none; border-radius: 50%; padding: 0; }
+.color-row input[type=text]{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#eee;padding:7px 12px;font-size:.9rem}
+#applyCustom{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#6a5af9,#3ecfcf);color:#fff;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .15s}
+#applyCustom:hover{opacity:.88}
+.shot-preview{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#aaa;margin-top:8px}
+.shot-dot{width:14px;height:14px;border-radius:50%;display:inline-block}
+.actions{display:flex;gap:12px;margin-top:10px}
+.actions a{flex:1;display:block;text-align:center;padding:13px;border-radius:10px;font-weight:700;font-size:.95rem;text-decoration:none;transition:opacity .15s}
+.btn-play{background:#8e44ad;color:#fff}
+.btn-back{background:rgba(255,255,255,.1);color:#ccc;border:1px solid rgba(255,255,255,.15)}
+.actions a:hover{opacity:.85}
+.section-label{font-size:.7rem;text-transform:uppercase;letter-spacing:2px;color:#666;margin-bottom:10px}
+</style>
+</head>
+<body>
+<h1>&#127912; Orbioo Open Source Skin Studio</h1>
+<p class="subtitle">Choose a preset or mix your own color.</p>
+
+<div class="card">
+  <h2>Preview</h2>
+  <div id="previewWrap"><canvas id="previewCanvas" width="180" height="180"></canvas></div>
+  <div class="shot-preview">Ejected mass colour:&nbsp;<span class="shot-dot" id="shotDot"></span>&nbsp;<span id="shotLabel"></span></div>
+</div>
+
+<div class="card" style="padding: 10px 16px;">
+  <div style="position: relative;">
+    <input type="text" id="skinSearch" placeholder="🔍 Search skins (e.g. USA, Tiger, Fire...)" 
+           style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 15px 12px 40px; color: white; font-size: 1rem; outline: none; transition: border-color 0.2s;">
+    <span style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5;">🔍</span>
+  </div>
+</div>
+
+<!-- ── Dynamic grids ──────────────────────────────────────── -->
+<div id="categoryContainer" style="width: 100%; max-width: 700px;"></div>
+
+<div class="card">
+  <h2>Custom Colour</h2>
+  <div class="color-row">
+    <label>Cell colour</label>
+    <input type="color" id="bodyPicker" value="#ff4400">
+    <input type="text"  id="bodyHex"   value="#ff4400" maxlength="7" placeholder="#rrggbb">
+  </div>
+  <div class="color-row">
+    <label>Shot colour</label>
+    <input type="color" id="shotPicker" value="#ffaa00">
+    <input type="text"  id="shotHex"   value="#ffaa00" maxlength="7" placeholder="#rrggbb">
+  </div>
+  <button id="applyCustom">&#10004; Apply Custom Colour</button>
+</div>
+
+<div class="card">
+  <div class="actions">
+    <a href="index.html" class="btn-back">&#8592; Back</a>
+    <a href="index.html" class="btn-play">&#9654; Play Now</a>
+  </div>
+</div>
+
+<script src="js/skinsData.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────
+let sel = JSON.parse(localStorage.getItem('agarSkin')||'null') || {mode:'preset',id:'default',body:'#e74c3c',shot:'#c0392b'};
+
+const _loadedImgs = {};
+
+function initImages() {
+    (window.SkinsRegistry || []).forEach(skin => {
+        if (skin.type === 'image' && skin.imageUrl) {
+            const img = new Image();
+            img.src = skin.imageUrl;
+            _loadedImgs[skin.id] = img;
+        }
+    });
+}
+
+// ── Preview canvas ────────────────────────────────────────
+const pvc = document.getElementById('previewCanvas');
+const pvx = pvc.getContext('2d');
+const CX=90, CY=90, R=72;
+const TWO_PI = Math.PI*2;
+
+function darken(hex,f){
+  if (!hex || hex[0] !== '#') return hex;
+  const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if(!m)return hex;
+  return 'rgb('+Math.round(parseInt(m[1],16)*f)+','+Math.round(parseInt(m[2],16)*f)+','+Math.round(parseInt(m[3],16)*f)+')';
+}
+
+function renderPreview(body, border, shot, playerName, skinDef) {
+  pvx.clearRect(0,0,180,180);
+
+  // cell body
+  pvx.beginPath(); pvx.arc(CX,CY,R,0,TWO_PI);
+  pvx.fillStyle=body;
+  pvx.strokeStyle=border||darken(body,0.7);
+  pvx.lineWidth=4; pvx.fill(); pvx.stroke();
+
+  if (skinDef && skinDef.glowColor) {
+    pvx.save();
+    pvx.beginPath(); pvx.arc(CX,CY,R+7,0,TWO_PI);
+    pvx.strokeStyle = skinDef.glowColor;
+    pvx.lineWidth = 8;
+    pvx.globalAlpha = 0.2;
+    pvx.stroke();
+    pvx.restore();
+  }
+
+  if (skinDef && skinDef.type === 'image') {
+    const img = _loadedImgs[skinDef.id];
+    if (img && img.complete && img.naturalWidth) {
+      drawSkinLogo(img);
+    } else if (img) {
+      img.onload = () => renderPreview(body, border, shot, playerName, skinDef);
+    }
+  }
+
+  drawName(playerName||'Preview', '#fff', CY);
+  drawShotDot(shot);
+}
+
+function drawSkinLogo(img) {
+  pvx.save();
+  pvx.beginPath();
+  pvx.arc(CX, CY, R-2, 0, TWO_PI);
+  pvx.clip();
+  pvx.drawImage(img, CX-R, CY-R, R*2, R*2);
+  pvx.restore();
+}
+
+function drawName(name, color, cy) {
+  pvx.textAlign='center'; pvx.textBaseline='middle';
+  pvx.font='bold 14px sans-serif';
+  pvx.strokeStyle='rgba(0,0,0,0.7)'; pvx.lineWidth=3; pvx.lineJoin='round';
+  pvx.fillStyle=color||'#fff';
+  pvx.strokeText(name, CX, cy);
+  pvx.fillText(name, CX, cy);
+}
+
+function drawShotDot(shot) {
+  pvx.beginPath(); pvx.arc(CX+R+16,CY,11,0,TWO_PI);
+  pvx.fillStyle=shot; pvx.strokeStyle=darken(shot,0.7); pvx.lineWidth=2;
+  pvx.fill(); pvx.stroke();
+  document.getElementById('shotDot').style.background=shot;
+  document.getElementById('shotLabel').textContent=shot;
+}
+
+// ── Build UI from Registry ────────────────────────────────
+function buildUI(query = '') {
+    const container = document.getElementById('categoryContainer');
+    container.innerHTML = ''; // Clear for re-rendering
+    
+    const skins = window.SkinsRegistry || [];
+    const searchLower = query.toLowerCase();
+    
+    // Group by category
+    const categories = {};
+    skins.forEach(s => {
+        // If searching, check label or category
+        if (query && !s.label.toLowerCase().includes(searchLower) && !s.category.toLowerCase().includes(searchLower)) {
+            return;
+        }
+        
+        const cat = s.category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(s);
+    });
+    
+    const catEntries = Object.entries(categories);
+    if (catEntries.length === 0) {
+        container.innerHTML = '<div class="card" style="text-align:center; color:#666;">No skins found matching your search.</div>';
+        return;
+    }
+
+    for (const [catName, catSkins] of catEntries) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.width = '100%'; // Ensure full width
+        card.innerHTML = `<h2>${catName} Skins</h2><p class="section-label">${catSkins.length} items available</p>`;
+        
+        const grid = document.createElement('div');
+        grid.className = 'skin-grid';
+        
+        catSkins.forEach(skin => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.dataset.id = skin.id;
+            if (sel.id === skin.id) btn.classList.add('active');
+            
+            let swatchContent = '';
+            let style = '';
+            
+            if (skin.type === 'image') {
+                swatchContent = `<img src="${skin.imageUrl}">`;
+                style = `background:${skin.bodyColor || '#222'}`;
+            } else {
+                if (skin.bodyColor) {
+                    style = `background:${skin.bodyColor}`;
+                } else {
+                    const hue = skin.bodyHue === -1 ? 200 : skin.bodyHue;
+                    style = `background:hsl(${hue}, 100%, 50%)`;
+                }
+            }
+            
+            btn.innerHTML = `<div class="swatch" style="${style}">${swatchContent}</div>${skin.label}`;
+            btn.addEventListener('click', () => selectSkin(skin));
+            grid.appendChild(btn);
+        });
+        
+        card.appendChild(grid);
+        container.appendChild(card);
+    }
+}
+
+// Add Search Listener
+document.getElementById('skinSearch').addEventListener('input', (e) => {
+    buildUI(e.target.value);
+});
+
+function selectSkin(s) {
+    clearActive();
+    const btn = document.querySelector(`[data-id="${s.id}"]`);
+    if (btn) btn.classList.add('active');
+    
+    let body = '#3498db', shot = '#2980b9';
+    
+    if (s.type === 'image') {
+        body = s.bodyColor || '#333';
+        shot = s.shotColor || body;
+    } else {
+        if (s.bodyColor) {
+            body = s.bodyColor;
+            shot = s.shotColor || darken(body, 0.7);
+        } else {
+            const hue = s.bodyHue === -1 ? 200 : s.bodyHue;
+            const sHue = s.shotHue === -1 ? 60 : s.shotHue;
+            body = `hsl(${hue}, 100%, 50%)`;
+            shot = `hsl(${sHue}, 100%, 50%)`;
+        }
+    }
+    
+    sel = { mode: s.type, id: s.id, body, shot };
+    save();
+    renderPreview(body, darken(body, 0.7), shot, s.label, s);
+}
+
+function clearActive(){ document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active')); }
+function save(){ localStorage.setItem('agarSkin',JSON.stringify(sel)); }
+
+// Custom colour pickers
+const bp=document.getElementById('bodyPicker'),bh=document.getElementById('bodyHex');
+const sp=document.getElementById('shotPicker'),sh=document.getElementById('shotHex');
+bp.addEventListener('input',()=>{bh.value=bp.value;renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);});
+sp.addEventListener('input',()=>{sh.value=sp.value;renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);});
+bh.addEventListener('input',()=>{if(/^#[0-9a-f]{6}$/i.test(bh.value)){bp.value=bh.value;renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);}});
+sh.addEventListener('input',()=>{if(/^#[0-9a-f]{6}$/i.test(sh.value)){sp.value=sh.value;renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);}});
+document.getElementById('applyCustom').addEventListener('click',()=>{
+  clearActive(); sel={mode:'custom',body:bp.value,shot:sp.value}; save();
+  renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);
+});
+
+// Init
+window.addEventListener('load', () => {
+    initImages();
+    buildUI();
+    
+    if (sel.id) {
+        const s = (window.SkinsRegistry || []).find(x => x.id === sel.id);
+        if (s) selectSkin(s);
+    } else {
+        bp.value=sel.body||'#ff4400'; bh.value=bp.value;
+        sp.value=sel.shot||'#ffaa00'; sh.value=sp.value;
+        renderPreview(bp.value,darken(bp.value,.7),sp.value,'Custom',null);
+    }
+});
+</script>
+</body>
+</html>

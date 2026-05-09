@@ -1,0 +1,57 @@
+{
+  "private": true,
+  "name": "my-app",
+  "version": "0.17.1",
+  "description": "npm init template for bootstrapping an empty Colyseus project",
+  "type": "module",
+  "main": "build/index.js",
+  "engines": {
+    "node": ">= 20.9.0"
+  },
+  "scripts": {
+    "dev": "npm start",
+    "start": "tsx watch src/index.ts",
+    "loadtest": "tsx src/loadtest/example.ts --room orbioo --numClients 500",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "rimraf build",
+    "test": "mocha -r tsx test/**.test.ts --exit --timeout 15000",
+    "cluster:start": "npx pm2 delete all & docker exec orbioo-redis redis-cli FLUSHALL & npm run build && npx pm2 start ecosystem.config.cjs && npx pm2 list",
+    "cluster:stop": "npx pm2 delete all",
+    "docker:up": "docker-compose up --build -d",
+    "docker:down": "docker-compose down"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/colyseus/create-colyseus/issues"
+  },
+  "homepage": "https://github.com/colyseus/create-colyseus#readme",
+  "devDependencies": {
+    "@colyseus/loadtest": "^0.17.7",
+    "@colyseus/sdk": "^0.17.17",
+    "@colyseus/testing": "^0.17.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.1",
+    "@types/mocha": "^10.0.1",
+    "@types/sat": "^0.0.35",
+    "@types/uuid": "^10.0.0",
+    "mocha": "^11.7.5",
+    "rimraf": "^5.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "@colyseus/monitor": "^0.17.8",
+    "@colyseus/playground": "^0.17.12",
+    "@colyseus/redis-driver": "0.17.5",
+    "@colyseus/redis-presence": "0.17.7",
+    "@colyseus/schema": "^4.0.0",
+    "@colyseus/tools": "^0.17.0",
+    "chess.js": "^1.4.0",
+    "colyseus": "^0.17.6",
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "sat": "^0.9.0",
+    "uuid": "^13.0.0"
+  }
+}

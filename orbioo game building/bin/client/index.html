@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Orbioo Open Source</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="css/main.css" />
+    <audio id="split_cell" src="audio/split.mp3"></audio>
+    <audio id="spawn_cell" src="audio/spawn.mp3"></audio>
+    <style>
+        /* ── Death overlay ────────────────────────────────── */
+        #deathOverlay, #disconnectOverlay, #loadingOverlay {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.85);
+            color: white; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 4000;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1);
+            border-top-color: #00ffff; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loadingOverlay h2 { font-family: 'Outfit', sans-serif; letter-spacing: 2px; color: #00ffff; }
+
+        /* ── Debug log ─────────────────────────────────────── */
+        #debug-log {
+            position: fixed; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.7); color: #f1c40f;
+            padding: 10px; font-family: monospace; z-index: 1000;
+            pointer-events: none; border-radius: 5px;
+            font-size: 12px; max-width: 320px; display: none;
+        }
+        #stats-log {
+            position: fixed; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.7); color: #2ecc71;
+            padding: 10px; font-family: monospace; z-index: 1000;
+            pointer-events: none; border-radius: 5px;
+            font-size: 12px; text-align: right; display: none;
+        }
+
+        /* ── Skin preview row ──────────────────────────────── */
+        #skinRow {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; margin: 10px 0;
+        }
+        #skinPreviewSwatch {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            background: #3498db; display: inline-block;
+        }
+        #skinLink { color: #7ecfff; text-decoration: none; font-size: 13px; font-weight: 600; }
+        #skinLink:hover { text-decoration: underline; }
+
+        /* ── Virtual Joystick + Action buttons (mobile only) ── */
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 220px;
+            pointer-events: none;
+            z-index: 600;
+        }
+
+        /* Joystick zone – left half */
+        #joystickZone {
+            position: absolute;
+            left: 10px; bottom: 16px;
+            width: 160px; height: 160px;
+            pointer-events: auto;
+        }
+        #joystickBase {
+            position: absolute;
+            width: 140px; height: 140px;
+            top: 10px; left: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            border: 3px solid rgba(255,255,255,0.3);
+        }
+        #joystickKnob {
+            position: absolute;
+            width: 60px; height: 60px;
+            top: 50px; left: 50px;   /* centered in 160×160 zone */
+            border-radius: 50%;
+            background: rgba(255,255,255,0.55);
+            border: 3px solid rgba(255,255,255,0.8);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            transition: none;
+        }
+
+        /* Action buttons – right side */
+        #actionBtns {
+            position: absolute;
+            right: 16px; bottom: 16px;
+            display: flex; flex-direction: column; gap: 14px;
+            pointer-events: auto;
+        }
+        .mob-btn {
+            width: 86px; height: 86px;
+            border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.7);
+            color: #fff; font-weight: 800;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+            touch-action: manipulation;
+        }
+        #btn-split { background: rgba(142, 68, 173, 0.88); }
+        #btn-feed  { background: rgba(230, 110, 15, 0.88); }
+        .mob-btn .bi  { font-size: 26px; line-height: 1; }
+        .mob-btn .bl  { font-size: 11px; margin-top: 3px; letter-spacing: 0.5px; }
+
+        /* Hybrid Mobile UI Logic */
+        #mobileControls, #mobile { 
+            display: none; 
+            z-index: 9999 !important; 
+        }
+
+        /* Classic buttons container needs to cover the screen for absolute positioning */
+        #mobile {
+            position: fixed;
+            bottom: 0; left: 0; right: 0; top: 0;
+            pointer-events: none;
+        }
+        #split, #feed {
+            pointer-events: auto;
+        }
+
+        /* FORCED Sync Logic: Show ONLY when in game (forcing on all devices for testing) */
+        body.game-active #mobileControls,
+        body.game-active #mobile {
+            display: block !important;
+        }
+
+        body.game-active #joystickZone,
+        body.game-active #mobile input {
+            display: flex !important;
+            pointer-events: auto;
+        }
+
+        /* Debug override for forcing mobile UI on PC */
+        body.force-mobile #mobileControls {
+            display: block !important;
+        }
+        body.force-mobile #split, body.force-mobile #feed {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- ── Game canvas area ──────────────────────────────── -->
+    <div id="gameAreaWrapper">
+        <div id="status"><span class="title">Leaderboard</span></div>
+        <div class="chatbox-container" id="chatboxContainer">
+            <div id="chatToggle" class="chat-toggle" title="Toggle Chat">
+                💬
+                <span id="chatBadge" class="chat-badge hidden">0</span>
+            </div>
+            <div class="chatbox" id="chatbox">
+                <ul id="chatList" class="chat-list"></ul>
+                <input id="chatInput" type="text" class="chat-input" placeholder="Chat here..." maxlength="35" />
+            </div>
+        </div>
+        <!-- Desktop image buttons -->
+        <div id="mobile">
+            <input type="image" id="split" class="split" src="img/split.png" alt="Split">
+            <input type="image" id="feed"  class="feed"  src="img/feed.png"  alt="Feed">
+        </div>
+        <canvas tabindex="1" id="cvs"></canvas>
+    </div>
+
+    <div id="mobileControls">
+        <div id="joystickZone">
+            <div id="joystickBase"></div>
+            <div id="joystickKnob"></div>
+        </div>
+    </div>
+
+    <!-- ── Death overlay ────────────────────────────────── -->
+    <div id="deathOverlay">
+        <h1 id="deathType"   style="font-size:48px;margin-bottom:20px;">YOU DIED</h1>
+        <p  id="deathReason" style="font-size:24px;margin-bottom:30px;"></p>
+        <button onclick="location.reload()"
+                style="padding:15px 40px;font-size:20px;cursor:pointer;background:#007bff;color:white;border:none;border-radius:5px;">
+            RETRY
+        </button>
+    </div>
+
+    <!-- ── Disconnect overlay ────────────────────────────── -->
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <h2 id="loadingText">CONNECTING TO ROOM...</h2>
+        <p style="font-size: 12px; color: #888; margin-top: 10px;">Synchronizing data, please wait.</p>
+    </div>
+
+    <div id="disconnectOverlay">
+        <h1 style="font-size:48px;margin-bottom:20px;color:#e74c3c;">CONNECTION LOST</h1>
+        <p id="disconnectReason" style="font-size:24px;margin-bottom:30px;">Disconnected from server.</p>
+        <button onclick="location.reload()"
+                style="padding:15px 40px;font-size:20px;cursor:pointer;background:#e74c3c;color:white;border:none;border-radius:5px;">
+            RECONNECT
+        </button>
+    </div>
+
+    <!-- ── Start menu ────────────────────────────────────── -->
+    <div id="startMenuWrapper">
+        <div id="debug-log">[DEBUG] System Ready</div>
+        <div id="stats-log">IN: 0 KB/s | OUT: 0 KB/s</div>
+
+        <div id="startMenu">
+            <p>Orbioo Open Source</p>
+            <input type="text" tabindex="0" autofocus
+                   placeholder="Enter your name here"
+                   id="playerNameInput" maxlength="25" />
+            <b class="input-error">Nick must be alphanumeric characters only!</b>
+            <br />
+
+            <a onclick="document.getElementById('spawn_cell').play();">
+                <button id="startButton">Play</button>
+            </a>
+
+            <button id="skinStudioButton" onclick="window.location.href='skin.html'" 
+                    style="background:#8e44ad; width: 100%; border-radius: 5px; height: 40px; color: white; border: 0; border-bottom: 2px solid #732d91; cursor: pointer; margin-bottom: 10px; font-size: large;">
+                🎨 Skin Studio
+            </button>
+            <button id="settingsButton">Settings</button>
+            <br />
+
+            <!-- ── Settings Modal ──────────────────────────────── -->
+            <div id="settingsModal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3>Settings</h3>
+                    <div class="settings-list">
+                        <label><input id="visBord"    type="checkbox"> Show border</label>
+                        <label><input id="showMass"   type="checkbox"> Show mass below name</label>
+                        <label><input id="showScore"  type="checkbox"> Show score inside cell</label>
+                        <label><input id="continuity" type="checkbox"> Continue moving off-screen</label>
+                        <label><input id="roundFood"  type="checkbox" checked> Rounded food</label>
+                        <label><input id="darkMode"   type="checkbox"> Dark Mode</label>
+                        <label><input id="showDebug"  type="checkbox"> Show Debug Log</label>
+                        <label><input id="showStats"  type="checkbox"> Show Stats Log</label>
+                    </div>
+                    <button id="closeSettings" class="modal-btn">Save & Close</button>
+                </div>
+            </div>
+
+            <div id="instructions">
+                <h3>Gameplay</h3>
+                <ul style="margin-top: 5px;">
+                    <li style="margin-bottom: 8px;">Mouse / joystick to move. <b>Space</b> to split. <b>W</b> to feed.</li>
+                    <li style="margin-bottom: 8px;">Eject costs only <b>10 points</b>. Feed a virus <b>4 times</b> to push it.</li>
+                    <li style="margin-bottom: 8px;">Small cells can <b>hide inside green viruses</b>.</li>
+                    <li style="margin-bottom: 8px;">Big cells hitting a virus <b>split into many pieces</b>.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Joystick + mobile action logic ─────────────────── -->
+    <script>
+    // Check on startup
+    // updateMobileVisibility logic removed; visibility now handled via body.game-active CSS
+
+    // Mobile action buttons
+    function mobAction(type, e) {
+        e.preventDefault();
+        if (!window._mobileSocket) return;
+        if (type === 'split') {
+            var a = document.getElementById('split_cell');
+            if (a) a.play();
+            window._mobileSocket.emit('2');
+        } else if (type === 'feed') {
+            window._mobileSocket.emit('1');
+        }
+    }
+
+    // ── Virtual Joystick ──────────────────────────────────
+    (function() {
+        var zone  = document.getElementById('joystickZone');
+        var knob  = document.getElementById('joystickKnob');
+        var BASE_R = 70;   // radius of base (140/2)
+        var KNOB_R = 30;   // radius of knob (60/2)
+        var MAX_D  = BASE_R - KNOB_R;   // max knob displacement
+
+        var active  = false;
+        var startX  = 0, startY = 0;
+        var zoneRect;
+
+        function getZoneCenter() {
+            zoneRect = zone.getBoundingClientRect();
+            return {
+                x: zoneRect.left + zoneRect.width  / 2,
+                y: zoneRect.top  + zoneRect.height / 2,
+            };
+        }
+
+        function onStart(e) {
+            e.preventDefault();
+            active = true;
+            var c = getZoneCenter();
+            startX = c.x; startY = c.y;
+            onMove(e);
+        }
+
+        function onMove(e) {
+            if (!active) return;
+            e.preventDefault();
+            var touch = e.touches ? e.touches[0] : e;
+            var dx = touch.clientX - startX;
+            var dy = touch.clientY - startY;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Clamp to max displacement
+            if (dist > MAX_D) {
+                dx = dx / dist * MAX_D;
+                dy = dy / dist * MAX_D;
+            }
+
+            // Move knob visually
+            knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+
+            // Send normalised direction to game as a target offset
+            // Scale up so the game camera / movement reacts strongly
+            var scale = 500;
+            if (window._mobileSocket) {
+                window._mobileSocket.emit('0', {
+                    x: dx / MAX_D * scale,
+                    y: dy / MAX_D * scale,
+                });
+            }
+            // Also update global.target so the game loop uses it
+            if (window._globalRef) {
+                window._globalRef.target = {
+                    x: dx / MAX_D * scale,
+                    y: dy / MAX_D * scale,
+                };
+                if (window._globalRef.canvas) {
+                    window._globalRef.canvas.target = window._globalRef.target;
+                }
+            }
+        }
+
+        function onEnd(e) {
+            if (!active) return;
+            active = false;
+            knob.style.transform = 'translate(0,0)';
+            // Stop movement
+            if (window._mobileSocket) {
+                window._mobileSocket.emit('0', { x: 0, y: 0 });
+            }
+            if (window._globalRef) {
+                window._globalRef.target = { x: 0, y: 0 };
+                if (window._globalRef.canvas) {
+                    window._globalRef.canvas.target = { x: 0, y: 0 };
+                }
+            }
+        }
+
+        zone.addEventListener('touchstart', onStart, { passive: false });
+        zone.addEventListener('touchmove',  onMove,  { passive: false });
+        zone.addEventListener('touchend',   onEnd,   { passive: false });
+        zone.addEventListener('touchcancel',onEnd,   { passive: false });
+
+        // Also support mouse for desktop testing
+        zone.addEventListener('mousedown', onStart);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup',   onEnd);
+    })();
+    </script>
+
+    <script src="//code.jquery.com/jquery-2.2.0.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
